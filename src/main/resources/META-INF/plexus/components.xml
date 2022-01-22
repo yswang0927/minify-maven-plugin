@@ -1,0 +1,10 @@
+<component-set>
+  <components>
+    <component>
+      <role>com.fh.foundry.maven.plugins.minify.BuildContext</role>
+      <role-hint>default</role-hint>
+      <implementation>com.fh.foundry.maven.plugins.minify.DefaultBuildContext</implementation>
+      <description>Filesystem based non-incremental build context implementation which behaves as if all files were just created.</description>
+    </component>
+  </components>
+</component-set>
