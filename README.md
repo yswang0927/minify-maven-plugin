@@ -180,6 +180,168 @@ execScript||function(b){a. ---> eval <--- .call(a,b);})
 这将排除文件名以min.js结尾的所有目录下的所有文件。执行 mvn clean package 现在不会产生警告消息，并且构建不会尝试缩小已经缩小的文件。
 
 
-### 6. 结论
+### 7. 使用 jslint 检测js语法（`<goal>jslint</goal>`）
+
+```xml
+<plugin>
+    <groupId>com.fh.foundry.maven</groupId>
+    <artifactId>minify-maven-plugin</artifactId>
+    <version>0.1</version>
+    <executions>
+        <execution>
+            <goals>
+		<goal>jslint</goal>
+                <goal>compress</goal>
+            </goals>
+        </execution>
+    </executions>
+    <configuration>
+        <excludes>
+            <exclude>**/*.min.js</exclude>
+        </excludes>
+    </configuration>
+</plugin>
+```
+
+### 8. 合并 js/css 文件
+
+好习惯：
+- 在网络上，是下载/调用一个大 js 文件而不是几个小文件。
+- 在源代码组织中是有源文件。
+
+主要的 js 和 css 框架/lib 提供两个版本的源代码（一个大的，很多小的），或者提供一个在线工具来生成大的。
+
+以下选项允许您在源代码中使用/存储小文件并在构建时生成大文件，合并是在yuicompression之后完成的。
+
+压缩每个 js 和 css 文件并将 `${project.build.directory}/${project.build.finalName}/static/` 下的每个 js 文件合并到 `all.js` 中：
+
+```xml
+<plugin>
+    <groupId>com.fh.foundry.maven</groupId>
+    <artifactId>minify-maven-plugin</artifactId>
+    <version>0.1</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>compress</goal>
+            </goals>
+        </execution>
+    </executions>
+    <configuration>
+        <nosuffix>true</nosuffix> 
+        <aggregations> 
+            <aggregation> 
+              <!-- 合并后删除文件（默认：false） 
+              <removeIncluded>true</removeIncluded>
+              --> 
+              <!-- 在每个连接后插入新行（默认：false）--> 
+              <insertNewLine>true</insertNewLine> 
+              <output>${project.build.directory}/${project.build.finalName}/static/all.js</output> 
+              <!-- 要包含的文件，相对于输出目录的路径或绝对路径--> 
+              <!--inputDir>非绝对包含的基本目录，默认为输出的父目录</inputDir --> 
+              <includes> 
+                <include>${basedir}/src/licenses/license.js</include> 
+                <include>**/*.js</include> 
+              </includes> 
+              <!-- 要排除的文件，相对于输出目录的路径
+              <excludes> 
+                <exclude>**/*.pack.js</exclude> 
+                <exclude>**/compressed.css</exclude> 
+              </excludes> 
+              --> 
+            </aggregation> 
+         </aggregations> 
+    </configuration>
+</plugin>
+```
+
+#### 添加标题（版权）
+
+在聚合缩小的 js 文件时，版权标头已被删除，这很好，因为我们不想在输出文件中重复多次。但是，能够在输出文件的开头插入一个会很棒。
+
+对于简单的情况，如果您对所有文件使用相同的标头，则 maven-license-plugin 就足够了，但如果您希望每个聚合具有不同的标头（具有不同许可方案的不同库），这还不够。
+
+- 您将许可证标头放在自己的文件中（例如 license_js.txt）
+- 将许可证头聚合到缩小的文件中。
+
+```xml
+<includes> 
+    <include>${project.build.sourceDirectory}/../webapp/js/mylib/copyright.txt</include> 
+    <include>mylib/**/*.js</include> 
+  </includes>
+```
+
+#### 添加文件名标题
+
+在聚合缩小的 js 或 css 文件时，文件头已被剥离。但是，如果能够在查看聚合文件时轻松识别相应的输入文件，那就太好了。
+
+```xml
+<configuration> 
+  <aggregations> 
+   <aggregation> 
+      <!-- 在每个连接后插入新行（默认：false）--> 
+      <insertNewLine>真</insertNewLine>
+      <!-- 在每个聚合文件前插入文件头（默认：false）--> 
+      <insertFileHeader>true</insertFileHeader> 
+      <output>${project.build.directory}/${project.build.finalName}/static/ all-3.js</output> 
+      <!-- 要包含的文件，相对于输出目录的路径 --> 
+      <includes> 
+	<include>**/*.js</include> 
+      </includes> 
+    </aggregation> 
+  < /aggregations> 
+</configuration> 
+```
+
+#### 自动排除先前聚合中包含的通配符匹配
+
+当为同一类型的文件（例如 css）定义了多个聚合时，在使用通配符包含的最终聚合上维护匹配排除可能会很乏味。自动排除已包含在先前聚合中的通配符匹配会很方便。
+
+```xml
+<configuration> 
+  <aggregations> 
+   <aggregation> 
+      <output>${project.build.directory}/${project.build.finalName} /static/IE.css</output>
+      <!-- 要包含的文件，相对于输出目录的路径 -->
+      <includes> 
+	<include>**/IE*.css</include> 
+      </includes> 
+    </aggregation> 
+   <aggregation> 
+      <!-- 排除之前聚合中包含的任何通配符匹配（默认：false）-- > 
+      <autoExcludeWildcards>true</autoExcludeWildcards> 
+      <output>${project.build.directory}/${project.build.finalName}/static/everything-except-IE.css</output> 
+      <!-- 要包含的文件, 相对于输出目录的路径 --> 
+      <includes> 
+	<include>**/*.css</include> 
+      </includes>
+    </aggregation> 
+  </aggregations>
+</configuration> 
+```
+
+### 9. 开启GZip压缩（`<gzip>true</gzip>`）
+
+压缩每个 js 和 css 文件并生成 gzip 版本（gzip 选项不会删除输入文件）：
+
+```xml
+<configuration> 
+  <gzip>true</gzip> 
+</configuration> 
+```
+
+### 10. 警告失败
+
+如果出现一些警告，FailOnWarning 允许停止构建过程。
+
+压缩每个 js 和 css 文件并在警告时失败（在 jslint 和/或压缩上）：
+
+```xml
+<configuration>
+  <failOnWarning>true</failOnWarning>
+</configuration>
+```
+
+### 11. 结论
 
 在本文中，我们描述了一种将 Javascript 和 CSS 文件的缩小集成到 Maven 工作流程中的好方法。
